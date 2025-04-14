@@ -1,0 +1,13 @@
+((λ<span style="color:#00f">m</span>.(λn.(λf.(λx.((n f) ((<span style="color:#00f">m</span> f) x)))))) <span style="color:#f00">(λf.(λx.(f x)))</span> (λf.(λx.(f (f x))))) --> 
+<br/>
+(λ<span style="color:#00f">n</span>.(λf.(λx.((<span style="color:#00f">n</span> f) (((λf.(λx.(f x))) f) x))))) <span style="color:#f00">(λf.(λx.(f (f x))))</span> --> 
+<br/>
+(λf.(λx.((λ<span style="color:#00f">f</span>.(λx.(<span style="color:#00f">f</span> (<span style="color:#00f">f</span> x)))) <span style="color:#f00">f</span> (((λf.(λx.(f x))) f) x)))) --> 
+<br/>
+(λf.(λx.(λ<span style="color:#00f">x</span>.(f (f <span style="color:#00f">x</span>))) <span style="color:#f00">(((λf.(λx.(f x))) f) x)</span>)) --> 
+<br/>
+(λf.(λx.(f (f ((λ<span style="color:#00f">f</span>.(λx.(<span style="color:#00f">f</span> x))) <span style="color:#f00">f</span> x))))) --> 
+<br/>
+(λf.(λx.(f (f (λ<span style="color:#00f">x</span>.(f <span style="color:#00f">x</span>)) <span style="color:#f00">x</span>)))) --> 
+<br/>
+(λf.(λx.(f (f (f x)))))
