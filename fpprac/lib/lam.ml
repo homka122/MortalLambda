@@ -326,4 +326,6 @@ let reduce (s : strategy) (n : int) (e : expression) =
 
 let _ = show_var_id := false
 let run_lambda s = print_expression (parse_lambda s)
-let run_lambda__small_step s = print_expression (reduce NO 400 (parse_lambda s))
+
+let run_lambda__small_step s =
+  print_expression (reduce CBV 600 (parse_lambda s))
