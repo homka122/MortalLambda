@@ -3,27 +3,27 @@ open Lam
 let () =
   run_lambda__small_step
     {|
-0 = \f. \x. x;
-1 = \f. \x. f x;
-2 = \f. \x. f (f x);
-3 = \f. \x. f (f (f x));
-SUCC = \n. \f. \x. f (n f x);
-TRUE = \a. \b. a;
-FALSE = \a. \b. b;
-PAIR = \x. \y. \c. c x y;
-FST = \p. p TRUE;
-SND = \p. p FALSE;
-SWAP = \p. PAIR (SND p) (FST p);
-PLUS = \m. \n. \f. \x. n f (m f x);
-COND = \i. \t. \e. i t e ;
-ISZERO = \f. f (\x. FALSE) TRUE;
-MUL = \m. \n. \f. \x. m (n f) x;
-NEXT = \p. PAIR (SND p) (SUCC (SND p));
-PRED = \n. FST (n NEXT (PAIR 0 0));
-Y = \f. (\x. f (x x)) (\x. f (x x));
-FACT = Y (\fact. \n. COND (ISZERO n) 1 (MUL n (fact (PRED n)))); 
+0 = \f. \x. x
+1 = \f. \x. f x
+2 = \f. \x. f (f x)
+3 = \f. \x. f (f (f x))
+SUCC = \n. \f. \x. f (n f x)
+TRUE = \a. \b. a
+FALSE = \a. \b. b
+PAIR = \x. \y. \c. c x y
+FST = \p. p TRUE
+SND = \p. p FALSE
+SWAP = \p. PAIR (SND p) (FST p)
+PLUS = \m. \n. \f. \x. n f (m f x)
+COND = \i. \t. \e. i t e    
+ISZERO = \f. f (\x. FALSE) TRUE
+MUL = \m. \n. \f. \x. m (n f) x
+NEXT = \p. PAIR (SND p) (SUCC (SND p))
+PRED = \n. \f. \x. n (\g. \h. h (g f)) (\u. x) (\u. u)
+Y = \f. (\x. f (x x)) (\x. f (x x))
+FACT = Y (\fact. \n. COND (ISZERO n) 1 (MUL n (fact (PRED n))))
 
-TRUE (PLUS 1 1) (PLUS 0 0)
+PRED 2
 
 |}
 

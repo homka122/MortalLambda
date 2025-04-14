@@ -99,11 +99,15 @@ let on_reduction extension_of_e redex_of_e =
 (* PARSE *)
 open Angstrom
 
-let ws =
+let ws_newline =
   let is_ws = function
     | '\x20' | '\x0a' | '\x0d' | '\x09' -> true
     | _ -> false
   in
+  take_while is_ws
+
+let ws =
+  let is_ws = function '\x20' | '\x0d' | '\x09' -> true | _ -> false in
   take_while is_ws
 
 let token s = ws *> string s
@@ -125,7 +129,7 @@ let p_macro_def p_e =
   lift2
     (fun name e -> (name, e))
     (ws *> take_while1 (function 'A' .. 'Z' | '0' .. '9' -> true | _ -> false))
-    (token "=" *> p_e <* token ";")
+    (token "=" *> p_e <* ws <* token "\n" <* ws_newline)
 
 let p_macro =
   ws *> peek_char_fail >>= function
@@ -156,7 +160,9 @@ let p_program =
           collect_macros macros)
     <|> return macros
   in
-  collect_macros StringMap.empty >>= (fun macros -> p_expression macros) <* ws
+  ws_newline *> collect_macros StringMap.empty
+  >>= (fun macros -> ws_newline *> p_expression macros)
+  <* ws_newline
 
 (* makes all variable unique by adding to each corresponding id. one way of implementing capture-avoiding substitution *)
 let parse_lambda s =
@@ -326,6 +332,4 @@ let reduce (s : strategy) (n : int) (e : expression) =
 
 let _ = show_var_id := false
 let run_lambda s = print_expression (parse_lambda s)
-
-let run_lambda__small_step s =
-  print_expression (reduce CBV 600 (parse_lambda s))
+let run_lambda__small_step s = print_expression (reduce NO 100 (parse_lambda s))
