@@ -37,6 +37,6 @@ FIB = (\fib. \n. SND (n fib (PAIR 1 0))) (\p. PAIR (ADD (FST p) (SND p)) (FST p)
 
 |}
 
-let () = run_lambda__small_step NO (macros ^ {|
-ADD 1 2
+let () = run_lambda__small_step AO (macros ^ {|
+  FACT 0
 |})

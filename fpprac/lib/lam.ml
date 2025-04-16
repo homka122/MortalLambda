@@ -46,7 +46,8 @@ let print_highlighted_redex redex_of_e extension_of_redex_e =
   let string_of_redex_app = ref "" in
   let string_of_e = ref (highlight_color_start highlight_expression_color) in
   let get_string_of_e highlight_var_with_id =
-    let rec helper = function
+    let rec helper ?(previous_captured_var_id = -3)
+        ?(previous_captured_again_var_id = -3) = function
       | Var v ->
           if v.id = -1 then
             string_of_e :=
@@ -54,28 +55,45 @@ let print_highlighted_redex redex_of_e extension_of_redex_e =
           else
             string_of_e :=
               !string_of_e
-              ^ (if highlight_var_with_id = v.id then
-                   highlight_color_start highlight_var_color
+              ^ (if
+                   highlight_var_with_id = v.id
+                   & v.id <> previous_captured_again_var_id
+                 then highlight_color_start highlight_var_color
                  else "")
               ^ v.name
               ^ (if !show_var_id then Int.to_string v.id else "")
-              ^ if highlight_var_with_id = v.id then highlight_color_end else ""
+              ^
+              if
+                highlight_var_with_id = v.id
+                & v.id <> previous_captured_again_var_id
+              then highlight_color_end
+              else ""
       | Abs (v, e) ->
           string_of_e :=
             !string_of_e ^ "(λ"
-            ^ (if highlight_var_with_id = v.id then
-                 highlight_color_start highlight_var_color
+            ^ (if
+                 highlight_var_with_id = v.id & v.id <> previous_captured_var_id
+               then highlight_color_start highlight_var_color
                else "")
             ^ (v.name ^ if !show_var_id then Int.to_string v.id else "")
-            ^ (if highlight_var_with_id = v.id then highlight_color_end else "")
+            ^ (if
+                 highlight_var_with_id = v.id & v.id <> previous_captured_var_id
+               then highlight_color_end
+               else "")
             ^ ".";
-          helper e;
+          helper e
+            ~previous_captured_var_id:
+              (if highlight_var_with_id = v.id then v.id
+               else previous_captured_var_id)
+            ~previous_captured_again_var_id:
+              (if v.id = previous_captured_var_id then v.id
+               else previous_captured_again_var_id);
           string_of_e := !string_of_e ^ ")"
       | App (e1, e2) ->
           string_of_e := !string_of_e ^ "(";
-          helper e1;
+          helper e1 ~previous_captured_var_id ~previous_captured_again_var_id;
           string_of_e := !string_of_e ^ " ";
-          helper e2;
+          helper e2 ~previous_captured_var_id ~previous_captured_again_var_id;
           string_of_e := !string_of_e ^ ")"
     in
     helper
@@ -343,4 +361,4 @@ let _ = show_var_id := false
 let run_lambda s = print_expression (parse_lambda s)
 
 let run_lambda__small_step ss s =
-  print_expression (reduce ss 3000 (parse_lambda s))
+  print_expression (reduce ss 7000 (parse_lambda s))
