@@ -12,29 +12,25 @@ type expression =
 
 let show_var_id = ref false
 
-let print_expression e =
-  let string_of_e = ref "" in
+let expression_to_string e =
   let rec helper = function
     | Var v ->
-        string_of_e :=
-          !string_of_e ^ v.name
-          ^ if !show_var_id then Int.to_string v.id else ""
+        v.name ^ if !show_var_id then Int.to_string v.id else ""
     | Abs (v, e) ->
-        string_of_e :=
-          !string_of_e ^ "(λ"
-          ^ (v.name ^ if !show_var_id then Int.to_string v.id else "")
-          ^ ".";
-        helper e;
-        string_of_e := !string_of_e ^ ")"
+        Format.asprintf "λ%s.%s" (helper (Var v)) (helper e)
     | App (e1, e2) ->
-        string_of_e := !string_of_e ^ "(";
-        helper e1;
-        string_of_e := !string_of_e ^ " ";
-        helper e2;
-        string_of_e := !string_of_e ^ ")"
+        let first = Format.asprintf (match e1 with
+        | Var _ | App _ -> "%s"
+        | Abs _ -> "(%s)") (helper e1) in
+        let second = Format.asprintf (match e2 with
+        | Var _ -> "%s"
+        | _ -> "(%s)") (helper e2) in
+        (first ^ second)
   in
-  helper e;
-  print_string !string_of_e
+  helper e
+
+let print_expression e =
+  expression_to_string e |> print_string
 
 let print_highlighted_redex redex_of_e extension_of_redex_e =
   let abs_e, abs_x, app_e = redex_of_e in
