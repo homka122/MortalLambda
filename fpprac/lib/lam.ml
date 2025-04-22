@@ -6,109 +6,71 @@ type expression =
   | Var of variable
   | Abs of variable * expression
   | App of expression * expression
+  | Redex of expression * expression
 [@@deriving show { with_path = false }]
 
 (* PRINT *)
 
 let show_var_id = ref false
 
+let redex_to_string (Redex (Abs (red_v, red_e), e2)) expr_to_str =
+  let wrap_to_color str color =
+    "<span style=\"color:" ^ color ^ "\">" ^ str ^ "</span>"
+  in
+  let wrap_variable v = Format.asprintf "%s" (wrap_to_color v.name "#00f") in
+  let first =
+    let rec helper = function
+      | Var v -> if red_v.id = v.id then wrap_variable v else v.name
+      | Abs (v, e) -> Format.asprintf "λ%s.%s" (helper (Var v)) (helper e)
+      | App (e1, e2) ->
+          let first =
+            Format.asprintf
+              (match e1 with
+              | Var _ | App _ | Redex _ -> "%s"
+              | Abs _ -> "(%s)")
+              (helper e1)
+          in
+          let second =
+            Format.asprintf
+              (match e2 with Var _ -> "%s" | _ -> "(%s)")
+              (helper e2)
+          in
+          first ^ second
+      | Redex _ -> failwith "Redex in redex"
+    in
+    helper (Abs (red_v, red_e))
+  in
+  let second =
+    wrap_to_color
+      (match e2 with
+      | Var v -> v.name
+      | _ -> Format.asprintf "(%s)" (expr_to_str e2))
+      "#f00"
+  in
+  Format.asprintf "(%s)%s" first second
+
 let expression_to_string e =
   let rec helper = function
-    | Var v ->
-        v.name ^ if !show_var_id then Int.to_string v.id else ""
-    | Abs (v, e) ->
-        Format.asprintf "λ%s.%s" (helper (Var v)) (helper e)
+    | Var v -> v.name ^ if !show_var_id then Int.to_string v.id else ""
+    | Abs (v, e) -> Format.asprintf "λ%s.%s" (helper (Var v)) (helper e)
     | App (e1, e2) ->
-        let first = Format.asprintf (match e1 with
-        | Var _ | App _ -> "%s"
-        | Abs _ -> "(%s)") (helper e1) in
-        let second = Format.asprintf (match e2 with
-        | Var _ -> "%s"
-        | _ -> "(%s)") (helper e2) in
-        (first ^ second)
+        let first =
+          Format.asprintf
+            (match e1 with Var _ | App _ | Redex _ -> "%s" | Abs _ -> "(%s)")
+            (helper e1)
+        in
+        let second =
+          Format.asprintf
+            (match e2 with Var _ -> "%s" | _ -> "(%s)")
+            (helper e2)
+        in
+        first ^ second
+    | Redex (Abs (v, e), e2) as r -> redex_to_string r helper
+    | _ -> failwith "Wrong implementation"
   in
   helper e
 
-let print_expression e =
-  expression_to_string e |> print_string
-
-let print_highlighted_redex redex_of_e extension_of_redex_e =
-  let abs_e, abs_x, app_e = redex_of_e in
-  let highlight_expression_color = "#f00" in
-  let highlight_var_color = "#00f" in
-  let highlight_color_start c = "<span style=\"color:" ^ c ^ "\">" in
-  let highlight_color_end = "</span>" in
-  let string_of_redex_abs = ref "" in
-  let string_of_redex_app = ref "" in
-  let string_of_e = ref (highlight_color_start highlight_expression_color) in
-  let get_string_of_e highlight_var_with_id =
-    let rec helper ?(previous_captured_var_id = -3)
-        ?(previous_captured_again_var_id = -3) = function
-      | Var v ->
-          if v.id = -1 then
-            string_of_e :=
-              !string_of_e ^ !string_of_redex_abs ^ " " ^ !string_of_redex_app
-          else
-            string_of_e :=
-              !string_of_e
-              ^ (if
-                   highlight_var_with_id = v.id
-                   & v.id <> previous_captured_again_var_id
-                 then highlight_color_start highlight_var_color
-                 else "")
-              ^ v.name
-              ^ (if !show_var_id then Int.to_string v.id else "")
-              ^
-              if
-                highlight_var_with_id = v.id
-                & v.id <> previous_captured_again_var_id
-              then highlight_color_end
-              else ""
-      | Abs (v, e) ->
-          string_of_e :=
-            !string_of_e ^ "(λ"
-            ^ (if
-                 highlight_var_with_id = v.id & v.id <> previous_captured_var_id
-               then highlight_color_start highlight_var_color
-               else "")
-            ^ (v.name ^ if !show_var_id then Int.to_string v.id else "")
-            ^ (if
-                 highlight_var_with_id = v.id & v.id <> previous_captured_var_id
-               then highlight_color_end
-               else "")
-            ^ ".";
-          helper e
-            ~previous_captured_var_id:
-              (if highlight_var_with_id = v.id then v.id
-               else previous_captured_var_id)
-            ~previous_captured_again_var_id:
-              (if v.id = previous_captured_var_id then v.id
-               else previous_captured_again_var_id);
-          string_of_e := !string_of_e ^ ")"
-      | App (e1, e2) ->
-          string_of_e := !string_of_e ^ "(";
-          helper e1 ~previous_captured_var_id ~previous_captured_again_var_id;
-          string_of_e := !string_of_e ^ " ";
-          helper e2 ~previous_captured_var_id ~previous_captured_again_var_id;
-          string_of_e := !string_of_e ^ ")"
-    in
-    helper
-  in
-  get_string_of_e (-2) app_e;
-  string_of_e := !string_of_e ^ highlight_color_end;
-  string_of_redex_app := !string_of_e;
-  string_of_e := "";
-  get_string_of_e abs_x.id (Abs (abs_x, abs_e));
-  string_of_redex_abs := !string_of_e;
-  string_of_e := "";
-  let e_with_extension = extension_of_redex_e (Var { name = ""; id = -1 }) in
-  get_string_of_e (-1) e_with_extension;
-  print_string !string_of_e
-
-let on_reduction extension_of_e redex_of_e =
-  print_highlighted_redex redex_of_e extension_of_e;
-  print_string " --> \n";
-  print_endline "<br/>"
+let print_expression e = expression_to_string e |> print_string
 
 (* PARSE *)
 open Angstrom
@@ -222,120 +184,161 @@ let parse_lambda s =
 
 type strategy = CBN | NO | CBV | AO
 
-let rec subst e (x : variable) v =
+let rec subst_local e (x : variable) v =
   match e with
   | Var y -> if y.id = x.id then v else e
-  | Abs (y, e1) -> if y.id = x.id then Abs (y, e1) else Abs (y, subst e1 x v)
-  | App (e1, e2) -> App (subst e1 x v, subst e2 x v)
+  | Abs (y, e1) ->
+      if y.id = x.id then Abs (y, e1) else Abs (y, subst_local e1 x v)
+  | App (e1, e2) -> App (subst_local e1 x v, subst_local e2 x v)
+  | Redex _ -> failwith "redex in subst"
+
+let subst e =
+  let rec helper = function
+    | Var v -> Var v
+    | Abs (y, e1) -> helper e1
+    | App (e1, e2) -> App (helper e1, helper e2)
+    | Redex (Abs (x, e1), e2) -> subst_local e1 x e2
+    | _ -> failwith "Wrong redex"
+  in
+  helper e
 
 exception OneReduction of expression
 
 (* rules: https://www.itu.dk/~sestoft/papers/sestoft-lamreduce.pdf *)
 
-let rec reduce_cbnk current_e k =
-  match current_e with
-  | Var x -> Var x
-  | Abs (x, e) -> Abs (x, e)
-  | App (e1, e2) -> (
-      match reduce_cbnk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
-      | Abs (x, e) ->
-          let s = subst e x e2 in
-          on_reduction k (e, x, e2);
-          raise (OneReduction (k s))
-          (* reduce_cbnk s ... *)
-          (* dont continue, stop after one redution *)
-      | e1' -> App (e1', e2))
+let find_redex_cbn e =
+  let rec helper = function
+    | a, true -> (a, true)
+    | a, false -> (
+        match a with
+        | Var x -> (Var x, false)
+        | Abs (x, e) -> (Abs (x, e), false)
+        | App (e1, e2) -> (
+            match helper (e1, false) with
+            | (Abs (x, e) as a), true -> (a, true)
+            | (Abs (x, e) as a), false -> (Redex (a, e2), true)
+            | e1', f -> (App (e1', e2), f))
+        | Redex _ as r -> (r, true))
+  in
+  match helper (e, false) with
+  | e_redex, true -> Some e_redex
+  | e_redex, false ->
+      print_expression e_redex;
+      None
+
+(* let rec reduce_cbnk current_e k =
+   match current_e with
+   | Var x -> Var x
+   | Abs (x, e) -> Abs (x, e)
+   | App (e1, e2) -> (
+       match reduce_cbnk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
+       | Abs (x, e) ->
+           (* Format.printf "\nABS_E: %s\nABS_X: %s\nAPP_E: %s\n" (expression_to_string e) (x.name) (expression_to_string e2); *)
+           let s = subst e x e2 in
+           on_reduction k (e, x, e2);
+           raise (OneReduction (k s))
+           (* reduce_cbnk s ... *)
+           (* dont continue, stop after one redution *)
+       | e1' -> App (e1', e2)) *)
 
 let reduce_cbn original_e =
-  try
-    let _ = reduce_cbnk original_e Fun.id in
-    None
-  with OneReduction next_e -> Some next_e
+  (* print_endline ("ORIGINAL: " ^ expression_to_string original_e); *)
+  match find_redex_cbn original_e with
+  | Some e ->
+      print_expression e;
+      print_string " --> ";
+      print_string "<br/><br/>\n";
+      Some (subst e)
+  | None -> None
+(* try
+     let _ = reduce_cbnk original_e Fun.id in
+     None
+   with OneReduction next_e -> Some next_e *)
 
-let rec reduce_cbvk current_e k =
-  match current_e with
-  | Var x -> Var x
-  | Abs (x, e) -> Abs (x, e)
-  | App (e1, e2) -> (
-      match reduce_cbvk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
-      | Abs (x, e) ->
-          let e2' =
-            reduce_cbvk e2 (fun reduced_e2 -> k (App (Abs (x, e), reduced_e2)))
-          in
-          let s = subst e x e2' in
-          on_reduction k (e, x, e2');
-          raise (OneReduction (k s))
-          (* reduce_cbvk s ... *)
-          (* dont continue, stop after one redution *)
-      | e1' ->
-          let e2' =
-            reduce_cbvk e2 (fun reduced_e2 -> k (App (e1', reduced_e2)))
-          in
-          App (e1', e2'))
+(* let rec reduce_cbvk current_e k =
+   match current_e with
+   | Var x -> Var x
+   | Abs (x, e) -> Abs (x, e)
+   | App (e1, e2) -> (
+       match reduce_cbvk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
+       | Abs (x, e) ->
+           let e2' =
+             reduce_cbvk e2 (fun reduced_e2 -> k (App (Abs (x, e), reduced_e2)))
+           in
+           let s = subst_local e x e2' in
+           on_reduction k (e, x, e2');
+           raise (OneReduction (k s))
+           (* reduce_cbvk s ... *)
+           (* dont continue, stop after one redution *)
+       | e1' ->
+           let e2' =
+             reduce_cbvk e2 (fun reduced_e2 -> k (App (e1', reduced_e2)))
+           in
+           App (e1', e2')) *)
 
-let reduce_cbv original_e =
-  try
-    let _ = reduce_cbvk original_e Fun.id in
-    None
-  with OneReduction next_e -> Some next_e
+(* let reduce_cbv original_e =
+   try
+     let _ = reduce_cbvk original_e Fun.id in
+     None
+   with OneReduction next_e -> Some next_e *)
 
-let rec reduce_aok current_e k =
-  match current_e with
-  | Var x -> Var x
-  | Abs (x, e) -> (
-      match reduce_aok e (fun reduced_e -> k (Abs (x, reduced_e))) with
-      | e' -> Abs (x, e'))
-  | App (e1, e2) -> (
-      match reduce_aok e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
-      | Abs (x, e) ->
-          let e2' =
-            reduce_aok e2 (fun reduced_e2 -> k (App (Abs (x, e), reduced_e2)))
-          in
-          let s = subst e x e2' in
-          on_reduction k (e, x, e2');
-          raise (OneReduction (k s))
-      (* reduce_aok s ... *)
-      (* dont continue, stop after one redution *)
-      | e1' ->
-          let e2' =
-            reduce_aok e2 (fun reduced_e2 -> k (App (e1', reduced_e2)))
-          in
-          App (e1', e2'))
+(* let rec reduce_aok current_e k =
+   match current_e with
+   | Var x -> Var x
+   | Abs (x, e) -> (
+       match reduce_aok e (fun reduced_e -> k (Abs (x, reduced_e))) with
+       | e' -> Abs (x, e'))
+   | App (e1, e2) -> (
+       match reduce_aok e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
+       | Abs (x, e) ->
+           let e2' =
+             reduce_aok e2 (fun reduced_e2 -> k (App (Abs (x, e), reduced_e2)))
+           in
+           let s = subst_local e x e2' in
+           on_reduction k (e, x, e2');
+           raise (OneReduction (k s))
+       (* reduce_aok s ... *)
+       (* dont continue, stop after one redution *)
+       | e1' ->
+           let e2' =
+             reduce_aok e2 (fun reduced_e2 -> k (App (e1', reduced_e2)))
+           in
+           App (e1', e2')) *)
+(*
+   let reduce_ao original_e =
+     try
+       let _ = reduce_aok original_e Fun.id in
+       None
+     with OneReduction next_e -> Some next_e *)
 
-let reduce_ao original_e =
-  try
-    let _ = reduce_aok original_e Fun.id in
-    None
-  with OneReduction next_e -> Some next_e
+(* let rec reduce_nok current_e k =
+   match current_e with
+   | Var x -> Var x
+   | Abs (x, e) -> (
+       match reduce_nok e (fun reduced_e -> k (Abs (x, reduced_e))) with
+       | e' -> Abs (x, e'))
+   | App (e1, e2) -> (
+       match reduce_cbnk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
+       | Abs (x, e) ->
+           let s = subst e x e2 in
+           on_reduction k (e, x, e2);
+           raise (OneReduction (k s))
+       (* reduce_nok s *)
+       (* dont continue, stop after one redution *)
+       | e1' ->
+           let e1'' =
+             reduce_nok e1' (fun reduced_e1' -> k (App (reduced_e1', e2)))
+           in
+           let e2' =
+             reduce_nok e2 (fun reduced_e2 -> k (App (e1'', reduced_e2)))
+           in
+           App (e1'', e2')) *)
 
-let rec reduce_nok current_e k =
-  match current_e with
-  | Var x -> Var x
-  | Abs (x, e) -> (
-      match reduce_nok e (fun reduced_e -> k (Abs (x, reduced_e))) with
-      | e' -> Abs (x, e'))
-  | App (e1, e2) -> (
-      match reduce_cbnk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
-      | Abs (x, e) ->
-          let s = subst e x e2 in
-          on_reduction k (e, x, e2);
-          raise (OneReduction (k s))
-      (* reduce_nok s *)
-      (* dont continue, stop after one redution *)
-      | e1' ->
-          let e1'' =
-            reduce_nok e1' (fun reduced_e1' -> k (App (reduced_e1', e2)))
-          in
-          let e2' =
-            reduce_nok e2 (fun reduced_e2 -> k (App (e1'', reduced_e2)))
-          in
-          App (e1'', e2'))
-
-let reduce_no original_e =
-  try
-    let _ = reduce_nok original_e Fun.id in
-    None
-  with OneReduction next_e -> Some next_e
+(* let reduce_no original_e =
+   try
+     let _ = reduce_nok original_e Fun.id in
+     None
+   with OneReduction next_e -> Some next_e *)
 
 let rec loop_reduce reduction_function e n =
   if n <= 0 then e
@@ -346,10 +349,10 @@ let rec loop_reduce reduction_function e n =
 
 let reduce (s : strategy) (n : int) (e : expression) =
   match s with
-  | CBV -> loop_reduce reduce_cbv e n
+  (* | CBV -> loop_reduce reduce_cbv e n *)
   | CBN -> loop_reduce reduce_cbn e n
-  | AO -> loop_reduce reduce_ao e n
-  | NO -> loop_reduce reduce_no e n
+(* | AO -> loop_reduce reduce_ao e n *)
+(* | NO -> loop_reduce reduce_no e n *)
 
 (* RUNNING *)
 
@@ -357,4 +360,4 @@ let _ = show_var_id := false
 let run_lambda s = print_expression (parse_lambda s)
 
 let run_lambda__small_step ss s =
-  print_expression (reduce ss 7000 (parse_lambda s))
+  print_expression (reduce ss 200 (parse_lambda s))
