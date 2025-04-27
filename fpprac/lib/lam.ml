@@ -324,7 +324,7 @@ let find_redex_no e =
       | Abs (x, e) -> Abs (x, helper e)
       | App (e1, e2) -> (
           let e1' =
-            match reduce_cbn e with
+            match find_redex_cbn e1 with
             | None -> e1
             | Some e ->
                 is_found := true;
@@ -338,8 +338,10 @@ let find_redex_no e =
                 Redex (a, e2)
             | e1' ->
                 let e1'' = helper e1' in
-                let e2' = helper e2 in
-                App (e1'', e2'))
+                if !is_found then App (e1'', e2)
+                else
+                  let e2' = helper e2 in
+                  App (e1'', e2'))
       | Redex _ as r -> r
   in
   let res = helper e in
@@ -372,4 +374,4 @@ let _ = show_var_id := false
 let run_lambda s = print_expression (parse_lambda s)
 
 let run_lambda__small_step ss s =
-  print_expression (reduce ss 200 (parse_lambda s))
+  print_expression (reduce ss 500 (parse_lambda s))
