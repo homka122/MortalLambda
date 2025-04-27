@@ -43,7 +43,7 @@ let redex_to_string (Redex (Abs (red_v, red_e), e2)) expr_to_str =
               (match e2 with Var _ -> "%s" | _ -> "(%s)")
               (helper e2)
           in
-          first ^ second
+          Format.asprintf "%s %s" first second
       | Redex _ -> failwith "Redex in redex"
     in
     helper (Abs (red_v, red_e))
@@ -79,7 +79,7 @@ let expression_to_string e =
             (match e2 with Var _ -> "%s" | _ -> "(%s)")
             (helper e2)
         in
-        first ^ second
+        Format.asprintf "%s %s" first second
     | Redex (Abs (v, e), e2) as r -> redex_to_string r helper
     | _ -> failwith "Wrong implementation"
   in
