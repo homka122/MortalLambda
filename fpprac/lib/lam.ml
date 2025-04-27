@@ -263,9 +263,11 @@ let find_redex_cbv e =
       | App (e1, e2) -> (
           match helper e1 with
           | Abs _ as a ->
-              is_found := true;
               let e2' = helper e2 in
-              Redex (a, e2')
+              if !is_found then App (a, e2')
+              else (
+                is_found := true;
+                Redex (a, e2'))
           | e1' ->
               let e2' = helper e2 in
               App (e1', e2'))
@@ -292,9 +294,11 @@ let find_redex_ao e =
       | App (e1, e2) -> (
           match helper e1 with
           | Abs _ as a ->
-              is_found := true;
               let e2' = helper e2 in
-              Redex (a, e2')
+              if !is_found then App (a, e2')
+              else (
+                is_found := true;
+                Redex (a, e2'))
           | e1' ->
               let e2' = helper e2 in
               App (e1', e2'))
