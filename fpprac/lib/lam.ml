@@ -246,53 +246,41 @@ let find_redex_cbn e =
   if !is_found then Some res else None
 
 let reduce_cbn original_e =
-  (* print_endline ("ORIGINAL: " ^ expression_to_string original_e); *)
   match find_redex_cbn original_e with
   | Some e ->
       print_html_expression e;
       Some (subst e)
   | None -> None
 
-(* let find_redex_cbv e =
-     let is_found = ref false in
-     let rec helper e =
-       if !is_found then e else
-         match e with
-         | Var x -> Var x
-         | Abs (x, e) -> Abs (x, e)
-         | App ((Abs _ as a), e2) ->
-             is_found := true;
-             Redex (a, e2)
-         | App (e1, e2) -> App (helper e1, helper e2)
-         | a -> a
+let find_redex_cbv e =
+  let is_found = ref false in
+  let rec helper e =
+    if !is_found then e
+    else
+      match e with
+      | Var x -> Var x
+      | Abs (x, e) -> Abs (x, e)
+      | App (e1, e2) -> (
+          match helper e1 with
+          | Abs (x, e) as a ->
+              is_found := true;
+              let e2' = helper e2 in
+              let s = subst_local e x e2' in
+              Redex (a, e2')
+          | e1' ->
+              let e2' = helper e2 in
+              App (e1', e2'))
+      | Redex _ as r -> r
+  in
+  let res = helper e in
+  if !is_found then Some res else None
 
-
-   let rec reduce_cbvk current_e k =
-     match current_e with
-     | Var x -> Var x
-     | Abs (x, e) -> Abs (x, e)
-     | App (e1, e2) -> (
-         match reduce_cbvk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
-         | Abs (x, e) ->
-             let e2' =
-               reduce_cbvk e2 (fun reduced_e2 -> k (App (Abs (x, e), reduced_e2)))
-             in
-             let s = subst_local e x e2' in
-             on_reduction k (e, x, e2');
-             raise (OneReduction (k s))
-             (* reduce_cbvk s ... *)
-             (* dont continue, stop after one redution *)
-         | e1' ->
-             let e2' =
-               reduce_cbvk e2 (fun reduced_e2 -> k (App (e1', reduced_e2)))
-             in
-             App (e1', e2')) *)
-
-(* let reduce_cbv original_e =
-   try
-     let _ = reduce_cbvk original_e Fun.id in
-     None
-   with OneReduction next_e -> Some next_e *)
+let reduce_cbv original_e =
+  match find_redex_cbv original_e with
+  | Some e ->
+      print_html_expression e;
+      Some (subst e)
+  | None -> None
 
 (* let rec reduce_aok current_e k =
    match current_e with
@@ -361,7 +349,7 @@ let rec loop_reduce reduction_function e n =
 
 let reduce (s : strategy) (n : int) (e : expression) =
   match s with
-  (* | CBV -> loop_reduce reduce_cbv e n *)
+  | CBV -> loop_reduce reduce_cbv e n
   | CBN -> loop_reduce reduce_cbn e n
 (* | AO -> loop_reduce reduce_ao e n *)
 (* | NO -> loop_reduce reduce_no e n *)
