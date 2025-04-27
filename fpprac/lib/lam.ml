@@ -14,6 +14,13 @@ type expression =
 let show_var_id = ref false
 
 let redex_to_string (Redex (Abs (red_v, red_e), e2)) expr_to_str =
+  let rec helper_abs expr_to_str = function
+    | Abs (u, (Abs _ as a)) ->
+        Format.asprintf "%s%s" u.name (helper_abs expr_to_str a)
+    | Abs (u, e) -> Format.asprintf "%s.%s" u.name (expr_to_str e)
+    | a -> Format.asprintf ".%s" (expr_to_str a)
+  in
+
   let wrap_to_color str color =
     "<span style=\"color:" ^ color ^ "\">" ^ str ^ "</span>"
   in
@@ -21,7 +28,8 @@ let redex_to_string (Redex (Abs (red_v, red_e), e2)) expr_to_str =
   let first =
     let rec helper = function
       | Var v -> if red_v.id = v.id then wrap_variable v else v.name
-      | Abs (v, e) -> Format.asprintf "λ%s.%s" (helper (Var v)) (helper e)
+      | Abs (v, e) ->
+          Format.asprintf "λ%s%s" (helper (Var v)) (helper_abs helper e)
       | App (e1, e2) ->
           let first =
             Format.asprintf
@@ -50,9 +58,16 @@ let redex_to_string (Redex (Abs (red_v, red_e), e2)) expr_to_str =
   Format.asprintf "(%s)%s" first second
 
 let expression_to_string e =
+  (* print_string (show_expression e); *)
+  let rec helper_abs expr_to_str = function
+    | Abs (u, (Abs _ as a)) ->
+        Format.asprintf "%s%s" u.name (helper_abs expr_to_str a)
+    | Abs (u, e) -> Format.asprintf "%s.%s" u.name (expr_to_str e)
+    | a -> Format.asprintf ".%s" (expr_to_str a)
+  in
   let rec helper = function
     | Var v -> v.name ^ if !show_var_id then Int.to_string v.id else ""
-    | Abs (v, e) -> Format.asprintf "λ%s.%s" (helper (Var v)) (helper e)
+    | Abs (v, e) -> Format.asprintf "λ%s%s" v.name (helper_abs helper e)
     | App (e1, e2) ->
         let first =
           Format.asprintf
