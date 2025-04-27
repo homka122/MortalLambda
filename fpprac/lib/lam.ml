@@ -222,22 +222,20 @@ exception OneReduction of expression
 (* rules: https://www.itu.dk/~sestoft/papers/sestoft-lamreduce.pdf *)
 
 let find_redex_cbn e =
-  let rec helper = function
-    | a, true -> (a, true)
-    | a, false -> (
-        match a with
-        | Var x -> (Var x, false)
-        | Abs (x, e) -> (Abs (x, e), false)
-        | App (e1, e2) -> (
-            match helper (e1, false) with
-            | (Abs _ as a), true -> (a, true)
-            | (Abs _ as a), false -> (Redex (a, e2), true)
-            | e1', f -> (App (e1', e2), f))
-        | Redex _ as r -> (r, true))
+  let is_found = ref false in
+  let rec helper e =
+    if !is_found then e
+    else
+      match e with
+      | Var x -> Var x
+      | Abs (x, e) -> Abs (x, e)
+      | App ((Abs _ as a), e2) ->
+          is_found := true;
+          Redex (a, e2)
+      | a -> a
   in
-  match helper (e, false) with
-  | e_redex, true -> Some e_redex
-  | _, false -> None
+  let res = helper e in
+  if !is_found then Some res else None
 
 (* let rec reduce_cbnk current_e k =
    match current_e with
