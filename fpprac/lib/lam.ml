@@ -314,34 +314,43 @@ let reduce_ao original_e =
       Some (subst e)
   | None -> None
 
-(* let rec reduce_nok current_e k =
-   match current_e with
-   | Var x -> Var x
-   | Abs (x, e) -> (
-       match reduce_nok e (fun reduced_e -> k (Abs (x, reduced_e))) with
-       | e' -> Abs (x, e'))
-   | App (e1, e2) -> (
-       match reduce_cbnk e1 (fun reduced_e1 -> k (App (reduced_e1, e2))) with
-       | Abs (x, e) ->
-           let s = subst e x e2 in
-           on_reduction k (e, x, e2);
-           raise (OneReduction (k s))
-       (* reduce_nok s *)
-       (* dont continue, stop after one redution *)
-       | e1' ->
-           let e1'' =
-             reduce_nok e1' (fun reduced_e1' -> k (App (reduced_e1', e2)))
-           in
-           let e2' =
-             reduce_nok e2 (fun reduced_e2 -> k (App (e1'', reduced_e2)))
-           in
-           App (e1'', e2')) *)
+let find_redex_no e =
+  let is_found = ref false in
+  let rec helper e =
+    if !is_found then e
+    else
+      match e with
+      | Var x -> Var x
+      | Abs (x, e) -> Abs (x, helper e)
+      | App (e1, e2) -> (
+          let e1' =
+            match reduce_cbn e with
+            | None -> e1
+            | Some e ->
+                is_found := true;
+                e
+          in
+          if !is_found then App (e1', e2)
+          else
+            match e1' with
+            | Abs _ as a ->
+                is_found := true;
+                Redex (a, e2)
+            | e1' ->
+                let e1'' = helper e1' in
+                let e2' = helper e2 in
+                App (e1'', e2'))
+      | Redex _ as r -> r
+  in
+  let res = helper e in
+  if !is_found then Some res else None
 
-(* let reduce_no original_e =
-   try
-     let _ = reduce_nok original_e Fun.id in
-     None
-   with OneReduction next_e -> Some next_e *)
+let reduce_no original_e =
+  match find_redex_no original_e with
+  | Some e ->
+      print_html_expression e;
+      Some (subst e)
+  | None -> None
 
 let rec loop_reduce reduction_function e n =
   if n <= 0 then e
@@ -355,7 +364,7 @@ let reduce (s : strategy) (n : int) (e : expression) =
   | CBV -> loop_reduce reduce_cbv e n
   | CBN -> loop_reduce reduce_cbn e n
   | AO -> loop_reduce reduce_ao e n
-(* | NO -> loop_reduce reduce_no e n *)
+  | NO -> loop_reduce reduce_no e n
 
 (* RUNNING *)
 
