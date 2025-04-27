@@ -210,7 +210,7 @@ let rec subst_local e (x : variable) v =
 let subst e =
   let rec helper = function
     | Var v -> Var v
-    | Abs (y, e1) -> helper e1
+    | Abs (y, e1) -> Abs (y, helper e1)
     | App (e1, e2) -> App (helper e1, helper e2)
     | Redex (Abs (x, e1), e2) -> subst_local e1 x e2
     | _ -> failwith "Wrong redex"
@@ -230,16 +230,14 @@ let find_redex_cbn e =
         | Abs (x, e) -> (Abs (x, e), false)
         | App (e1, e2) -> (
             match helper (e1, false) with
-            | (Abs (x, e) as a), true -> (a, true)
-            | (Abs (x, e) as a), false -> (Redex (a, e2), true)
+            | (Abs _ as a), true -> (a, true)
+            | (Abs _ as a), false -> (Redex (a, e2), true)
             | e1', f -> (App (e1', e2), f))
         | Redex _ as r -> (r, true))
   in
   match helper (e, false) with
   | e_redex, true -> Some e_redex
-  | e_redex, false ->
-      print_expression e_redex;
-      None
+  | _, false -> None
 
 (* let rec reduce_cbnk current_e k =
    match current_e with
@@ -262,7 +260,7 @@ let reduce_cbn original_e =
   | Some e ->
       print_expression e;
       print_string " --> ";
-      print_string "<br/><br/>\n";
+      print_string "<br/>\n";
       Some (subst e)
   | None -> None
 (* try
