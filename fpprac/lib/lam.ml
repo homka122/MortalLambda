@@ -87,6 +87,11 @@ let expression_to_string e =
 
 let print_expression e = expression_to_string e |> print_string
 
+let print_html_expression e =
+  print_expression e;
+  print_string " --> ";
+  print_string "<br/>\n"
+
 (* PARSE *)
 open Angstrom
 
@@ -232,6 +237,7 @@ let find_redex_cbn e =
       | App ((Abs _ as a), e2) ->
           is_found := true;
           Redex (a, e2)
+      | App (e1, e2) -> App (helper e1, helper e2)
       | a -> a
   in
   let res = helper e in
@@ -256,9 +262,7 @@ let reduce_cbn original_e =
   (* print_endline ("ORIGINAL: " ^ expression_to_string original_e); *)
   match find_redex_cbn original_e with
   | Some e ->
-      print_expression e;
-      print_string " --> ";
-      print_string "<br/>\n";
+      print_html_expression e;
       Some (subst e)
   | None -> None
 (* try
